@@ -1,0 +1,14 @@
+algorithm_name: run_boss
+algorithm_params:
+    use_bes: true
+score_name: use_conditional_gaussian_score
+score_params:
+    penalty_discount: 2
+bootstrap_params:
+    numberResampling: 0
+    percent_resample_size: 100
+    add_original: true
+    with_replacement: true
+    resampling_ensemble: 3
+    seed: -1
+num_threads: 1

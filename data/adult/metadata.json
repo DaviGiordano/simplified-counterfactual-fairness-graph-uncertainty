@@ -1,0 +1,56 @@
+{
+    "domains": [
+        {
+            "name": "age",
+            "discrete": false
+        },
+        {
+            "name": "workclass",
+            "discrete": true
+        },
+        {
+            "name": "education",
+            "discrete": true
+        },
+        {
+            "name": "education-num",
+            "discrete": false
+        },
+        {
+            "name": "marital-status",
+            "discrete": true
+        },
+        {
+            "name": "occupation",
+            "discrete": true
+        },
+        {
+            "name": "relationship",
+            "discrete": true
+        },
+        {
+            "name": "race",
+            "discrete": true
+        },
+        {
+            "name": "sex",
+            "discrete": true
+        },
+        {
+            "name": "capital-gain",
+            "discrete": false
+        },
+        {
+            "name": "capital-loss",
+            "discrete": false
+        },
+        {
+            "name": "hours-per-week",
+            "discrete": false
+        },
+        {
+            "name": "native-country",
+            "discrete": true
+        }
+    ]
+}

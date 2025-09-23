@@ -1,0 +1,13 @@
+.venv/*
+*.pyc
+*.pdf
+*.png
+*.svg
+*.pkl
+*.log
+.vscode/*
+output/*
+*.dot
+*.txt
+*.csv
+*.pkl
