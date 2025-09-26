@@ -50,6 +50,17 @@ def parse_cli():
             "FAIRGBM_no_sensitive",
             "FAIRGBM_equal_opportunity",
             "FAIRGBM_predictive_equality",
+            # Add FairLearn options
+            "FAIRLEARN_LR",
+            "FAIRLEARN_RF",
+            "FAIRLEARN_GB",
+            "FAIRLEARN_LR_no_sensitive",
+            "FAIRLEARN_RF_no_sensitive",
+            "FAIRLEARN_GB_no_sensitive",
+            "FAIRLEARN_demographic_parity",
+            "FAIRLEARN_equalized_odds",
+            "FAIRLEARN_equal_opportunity",
+            "FAIRLEARN_predictive_equality",
         ],
         required=True,
     )
@@ -70,6 +81,24 @@ def parse_cli():
         type=int,
         default=1,
         help="Number of parallel jobs for FAIRGBM hyperparameter tuning (advanced wrapper)",
+    )
+    # Add FairLearn-specific arguments
+    p.add_argument(
+        "--fairlearn-config",
+        type=str,
+        help="Path to FairLearn hyperparameter configuration file",
+    )
+    p.add_argument(
+        "--fairlearn-trials",
+        type=int,
+        default=20,
+        help="Number of hyperparameter tuning trials for FairLearn",
+    )
+    p.add_argument(
+        "--fairlearn-jobs",
+        type=int,
+        default=1,
+        help="Number of parallel jobs for FairLearn hyperparameter tuning",
     )
     return p.parse_args()
 
@@ -109,8 +138,19 @@ if __name__ == "__main__":
         fairgbm_kwargs["n_trials"] = args.fairgbm_trials
         fairgbm_kwargs["n_jobs"] = args.fairgbm_jobs
 
+    # Prepare FairLearn-specific arguments
+    fairlearn_kwargs = {}
+    if args.classifier.startswith("FAIRLEARN"):
+        if args.fairlearn_config:
+            fairlearn_kwargs["config_path"] = Path(args.fairlearn_config)
+        fairlearn_kwargs["n_trials"] = args.fairlearn_trials
+        fairlearn_kwargs["n_jobs"] = args.fairlearn_jobs
+
+    # Combine all kwargs
+    all_kwargs = {**fairgbm_kwargs, **fairlearn_kwargs}
+
     classifier, y_pred = fit_evaluate_classifier(
-        args.classifier, enc_dataset, model_metrics_output_dir, **fairgbm_kwargs
+        args.classifier, enc_dataset, model_metrics_output_dir, **all_kwargs
     )
     mw_counterfactuals.evaluate_counterfactual_fairness(
         classifier,

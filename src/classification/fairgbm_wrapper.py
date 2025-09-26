@@ -37,8 +37,6 @@ class FairGBMWrapper:
         fair_metric: str = "equalized_odds_ratio",
         alpha: float = 0.5,
     ):
-        if not FAIRGBM_AVAILABLE:
-            raise ImportError("FAIRGBM not available. Install required packages.")
 
         self.config_path = config_path
         self.n_trials = n_trials

@@ -18,6 +18,14 @@ try:
 except ImportError:
     FAIRGBM_AVAILABLE = False
 
+# Import FairLearn wrapper
+try:
+    from src.classification.fairlearn_wrapper import fit_fairlearn_classifier
+
+    FAIRLEARN_AVAILABLE = True
+except ImportError:
+    FAIRLEARN_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -41,6 +49,12 @@ def fit_evaluate_classifier(
         if not FAIRGBM_AVAILABLE:
             raise ImportError("FAIRGBM not available. Install required packages.")
         return fit_fairgbm_classifier(model_tag, enc_dataset, output_dir, **kwargs)
+
+    # Handle FairLearn models
+    if model_tag.startswith("FAIRLEARN"):
+        if not FAIRLEARN_AVAILABLE:
+            raise ImportError("FairLearn not available. Install required packages.")
+        return fit_fairlearn_classifier(model_tag, enc_dataset, output_dir, **kwargs)
 
     # Handle standard models
     if model_tag not in MODEL_MAPPING:

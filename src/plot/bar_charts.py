@@ -114,16 +114,16 @@ def plot_score_variance(df: pd.DataFrame, save_path: str | None = None):
     set_pub_theme()
     _maybe_mkdir(save_path)
 
-    hue_order = ["RF", "GB", "LR", "FAIRGBM"]
+    # hue_order = ["RF", "GB", "LR", "FAIRGBM"]
     palette = tol_palette("vibrant")
-    palette = [palette[1], palette[0], palette[2], palette[3]]
+    # palette = [palette[1], palette[0], palette[2], palette[3]]
 
     g = sns.catplot(
         data=df,
         x="knowledge",
         y="score_variance_by_individual",
         hue="classifier",
-        hue_order=hue_order,
+        # hue_order=hue_order,
         kind="bar",
         dodge=0.7,
         estimator="mean",
@@ -151,7 +151,6 @@ def plot_score_variance(df: pd.DataFrame, save_path: str | None = None):
 
     if save_path:
         plt.savefig(save_path, bbox_inches="tight", dpi=300)
-    plt.show()
     return g
 
 
@@ -161,14 +160,14 @@ def plot_counterfactual_metrics(
     set_pub_theme()
     _maybe_mkdir(save_path)
 
-    hue_order = [
-        "RF",
-        "GB",
-        "LR",
-        "FAIRGBM",
-    ]
+    # hue_order = [
+    #     "RF",
+    #     "GB",
+    #     "LR",
+    #     "FAIRGBM",
+    # ]
     palette = tol_palette("vibrant")
-    palette = [palette[1], palette[0], palette[2], palette[3]]
+    # palette = [palette[1], palette[0], palette[2], palette[3]]
 
     g = sns.catplot(
         data=data,
@@ -176,7 +175,7 @@ def plot_counterfactual_metrics(
         y="Rate",
         kind="bar",
         hue="Classifier",
-        hue_order=hue_order,
+        # hue_order=hue_order,
         col="intervention",
         col_order=interventions,
         row="metric",
@@ -215,7 +214,6 @@ def plot_counterfactual_metrics(
 
     if save_path:
         plt.savefig(save_path, bbox_inches="tight", dpi=300)
-    plt.show()
     return g
 
 
@@ -312,7 +310,6 @@ def plot_counterfactual_quality(
 
     if save_path:
         plt.savefig(save_path, bbox_inches="tight", dpi=300)
-    plt.show()
 
     return fig, ax
 
@@ -459,7 +456,6 @@ def plot_model_performance(performance_df: pd.DataFrame, save_path: str | None =
 
     if save_path:
         plt.savefig(save_path, bbox_inches="tight", dpi=300)
-    plt.show()
 
     return fig, axes
 
@@ -534,6 +530,5 @@ def plot_group_fairness(fairness_df: pd.DataFrame, save_path: str | None = None)
 
     if save_path:
         plt.savefig(save_path, bbox_inches="tight", dpi=300)
-    plt.show()
 
     return fig, ax
