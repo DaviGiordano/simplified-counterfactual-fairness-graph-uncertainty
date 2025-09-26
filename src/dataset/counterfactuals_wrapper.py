@@ -29,15 +29,28 @@ class MultiWorldCounterfactuals:
 
     def score_counterfactuals(self, classifier):
         """Computes and stores the scores of the counterfactuals, for a given classifier"""
+        # Get feature names with fallback for different classifier types
+        if hasattr(classifier, "feature_names_in_"):
+            feature_names = classifier.feature_names_in_
+        elif hasattr(classifier, "feature_name_"):
+            feature_names = classifier.feature_name_
+        elif hasattr(classifier, "_Booster") and hasattr(
+            classifier._Booster, "feature_name"
+        ):
+            feature_names = classifier._Booster.feature_name()
+        else:
+            # Fallback: use all columns from counterfactuals
+            feature_names = self.counterfactuals.columns.tolist()
+
         logger.info(
-            f"Predicting counterfactual scores with features: {list(classifier.feature_names_in_)}"
+            f"Predicting counterfactual scores with features: {list(feature_names)}"
         )
 
         idx_positive_class = np.where(classifier.classes_ == 1)[0][0]  # type: ignore
         self.scores = pd.Series(
-            classifier.predict_proba(
-                self.counterfactuals[list(classifier.feature_names_in_)]
-            )[:, idx_positive_class],
+            classifier.predict_proba(self.counterfactuals[list(feature_names)])[
+                :, idx_positive_class
+            ],
             index=self.counterfactuals.index,
         )
 
@@ -45,14 +58,25 @@ class MultiWorldCounterfactuals:
         """
         Computes and stores counterfactual predictions, given a classifier
         """
+        # Get feature names with fallback for different classifier types
+        if hasattr(classifier, "feature_names_in_"):
+            feature_names = classifier.feature_names_in_
+        elif hasattr(classifier, "feature_name_"):
+            feature_names = classifier.feature_name_
+        elif hasattr(classifier, "_Booster") and hasattr(
+            classifier._Booster, "feature_name"
+        ):
+            feature_names = classifier._Booster.feature_name()
+        else:
+            # Fallback: use all columns from counterfactuals
+            feature_names = self.counterfactuals.columns.tolist()
+
         logger.info(
-            f"Predicting counterfactual outputs with features {list(classifier.feature_names_in_)}"
+            f"Predicting counterfactual outputs with features {list(feature_names)}"
         )
 
         self.counterfactual_predictions = pd.Series(
-            classifier.predict(
-                self.counterfactuals[list(classifier.feature_names_in_)]
-            ),
+            classifier.predict(self.counterfactuals[list(feature_names)]),
             index=self.counterfactuals.index,
         )
 

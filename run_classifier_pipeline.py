@@ -45,8 +45,31 @@ def parse_cli():
             "LR_no_sensitive",
             "RF_no_sensitive",
             "GB_no_sensitive",
+            # Add FAIRGBM options
+            "FAIRGBM",
+            "FAIRGBM_no_sensitive",
+            "FAIRGBM_equal_opportunity",
+            "FAIRGBM_predictive_equality",
         ],
         required=True,
+    )
+    # Add FAIRGBM-specific arguments
+    p.add_argument(
+        "--fairgbm-config",
+        type=str,
+        help="Path to FAIRGBM hyperparameter configuration file",
+    )
+    p.add_argument(
+        "--fairgbm-trials",
+        type=int,
+        default=20,
+        help="Number of hyperparameter tuning trials for FAIRGBM (advanced wrapper with Optuna)",
+    )
+    p.add_argument(
+        "--fairgbm-jobs",
+        type=int,
+        default=1,
+        help="Number of parallel jobs for FAIRGBM hyperparameter tuning (advanced wrapper)",
     )
     return p.parse_args()
 
@@ -77,8 +100,17 @@ if __name__ == "__main__":
         causal_worlds: list[CausalWorld] = pickle.load(f)
 
     enc_dataset, col_trf = load_dataset_col_trf(args.dataset)
+
+    # Prepare FAIRGBM-specific arguments
+    fairgbm_kwargs = {}
+    if args.classifier.startswith("FAIRGBM"):
+        if args.fairgbm_config:
+            fairgbm_kwargs["config_path"] = Path(args.fairgbm_config)
+        fairgbm_kwargs["n_trials"] = args.fairgbm_trials
+        fairgbm_kwargs["n_jobs"] = args.fairgbm_jobs
+
     classifier, y_pred = fit_evaluate_classifier(
-        args.classifier, enc_dataset, model_metrics_output_dir
+        args.classifier, enc_dataset, model_metrics_output_dir, **fairgbm_kwargs
     )
     mw_counterfactuals.evaluate_counterfactual_fairness(
         classifier,

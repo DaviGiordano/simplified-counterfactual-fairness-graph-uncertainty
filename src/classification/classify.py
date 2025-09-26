@@ -10,6 +10,14 @@ from sklearn.linear_model import LogisticRegression
 from src.dataset.dataset_wrappers import EncodedDatasetWrapper
 from src.metrics.model_metrics import evaluate_group_fairness, evaluate_performance
 
+# Import FAIRGBM wrapper
+try:
+    from src.classification.fairgbm_wrapper import fit_fairgbm_classifier
+
+    FAIRGBM_AVAILABLE = True
+except ImportError:
+    FAIRGBM_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -17,6 +25,7 @@ def fit_evaluate_classifier(
     model_tag: str,
     enc_dataset: EncodedDatasetWrapper,
     output_dir: Path,
+    **kwargs,  # Additional arguments for FAIRGBM
 ) -> tuple[ClassifierMixin, pd.Series]:
     MODEL_MAPPING = {
         "LR": LogisticRegression,
@@ -26,6 +35,16 @@ def fit_evaluate_classifier(
         "RF_no_sensitive": RandomForestClassifier,
         "GB_no_sensitive": GradientBoostingClassifier,
     }
+
+    # Handle FAIRGBM models
+    if model_tag.startswith("FAIRGBM"):
+        if not FAIRGBM_AVAILABLE:
+            raise ImportError("FAIRGBM not available. Install required packages.")
+        return fit_fairgbm_classifier(model_tag, enc_dataset, output_dir, **kwargs)
+
+    # Handle standard models
+    if model_tag not in MODEL_MAPPING:
+        raise ValueError(f"Unknown model tag: {model_tag}")
 
     logger.info(f"Fit evaluate classifier {model_tag}")
     classifier = MODEL_MAPPING[model_tag]()

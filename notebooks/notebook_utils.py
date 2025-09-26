@@ -35,11 +35,25 @@ def load_score_variance_data(base_path, dataset_tag, knowledge_levels, classifie
     # Removing results that used sensitive feature to classify
     df_score_var = df_score_var[
         df_score_var["classifier"].isin(
-            ["GB_no_sensitive", "RF_no_sensitive", "LR_no_sensitive"]
+            [
+                "GB_no_sensitive",
+                "RF_no_sensitive",
+                "LR_no_sensitive",
+                "FAIRGBM",
+                "FAIRGBM_equal_opportunity",
+                "FAIRGBM_predictive_equality",
+            ]
         )
     ]
     df_score_var["classifier"] = df_score_var["classifier"].replace(
-        {"GB_no_sensitive": "GB", "RF_no_sensitive": "RF", "LR_no_sensitive": "LR"}
+        {
+            "GB_no_sensitive": "GB",
+            "RF_no_sensitive": "RF",
+            "LR_no_sensitive": "LR",
+            "FAIRGBM": "FAIRGBM",
+            "FAIRGBM_equal_opportunity": "FAIRGBM_equal_opportunity",
+            "FAIRGBM_predictive_equality": "FAIRGBM_predictive_equality",
+        }
     )
     df_score_var["knowledge"] = df_score_var["knowledge"].map(
         {"low": "Low", "med": "High"}
@@ -111,11 +125,25 @@ def load_and_tidy_fairness_metrics(
     # Removing results that used sensitive feature to classify
     tidy = tidy[
         tidy["Classifier"].isin(
-            ["GB_no_sensitive", "RF_no_sensitive", "LR_no_sensitive"]
+            [
+                "GB_no_sensitive",
+                "RF_no_sensitive",
+                "LR_no_sensitive",
+                "FAIRGBM",
+                "FAIRGBM_equal_opportunity",
+                "FAIRGBM_predictive_equality",
+            ]
         )
     ]
     tidy["Classifier"] = tidy["Classifier"].replace(
-        {"GB_no_sensitive": "GB", "RF_no_sensitive": "RF", "LR_no_sensitive": "LR"}
+        {
+            "GB_no_sensitive": "GB",
+            "RF_no_sensitive": "RF",
+            "LR_no_sensitive": "LR",
+            "FAIRGBM": "FAIRGBM",
+            "FAIRGBM_equal_opportunity": "FAIRGBM_equal_opportunity",
+            "FAIRGBM_predictive_equality": "FAIRGBM_predictive_equality",
+        }
     )
     tidy["Knowledge"] = tidy["Knowledge"].map({"Low": "Low", "Medium": "High"})
 
