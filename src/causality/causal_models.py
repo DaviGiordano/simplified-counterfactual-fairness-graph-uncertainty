@@ -221,16 +221,32 @@ class DiffusionCausalModel(CausalModelFitter):
         """Fit diffusion causal mechanisms."""
         logger.info("Fitting diffusion causal mechanisms...")
 
-        # For now, use linear mechanisms as placeholder for diffusion
-        # TODO: Implement actual diffusion mechanisms when external library is available
+        # Import the external diffusion model
+        from external.DiffusionBasedCausalModels.model.diffusion import (
+            CausalDiffusionModel,
+        )
+
+        # Set diffusion mechanisms for non-root nodes with default parameters
         for node in self.graph.nodes:
             if self.graph.in_degree(node) == 0:
                 mechanism = gcm.EmpiricalDistribution()
             else:
-                # Placeholder: use linear regression until diffusion is implemented
-                mechanism = gcm.AdditiveNoiseModel(
-                    prediction_model=gcm.ml.create_linear_regressor(),
-                    noise_model=gcm.ScipyDistribution(norm),
+                # Use actual diffusion mechanism with default parameters
+                mechanism = CausalDiffusionModel(
+                    hidden_dim=64,  # Default from library
+                    use_positional_encoding=False,  # Default from library
+                    t_dim=8,  # Default from library
+                    lr=1e-4,  # Default from library
+                    weight_decay=0.001,  # Default from library
+                    batch_size=64,  # Default from library
+                    num_epochs=10,  # Default from library
+                    use_gpu_if_available=True,  # Default from library
+                    verbose=False,  # Default from library
+                    w=0,  # Default from library
+                    lambda_loss=0,  # Default from library
+                    T=100,  # Default from library
+                    betas=None,  # Default from library
+                    clip=False,  # Default from library
                 )
             self.scm.set_causal_mechanism(node, mechanism)
 
@@ -267,6 +283,14 @@ class DiffusionCausalModel(CausalModelFitter):
 
         return df_cf[test_data.columns]
 
+    def evaluate(self, test_data: pd.DataFrame) -> Dict[str, float]:
+        """Evaluate diffusion model performance."""
+        evaluation = gcm.evaluate_causal_model(self.scm, test_data)
+        return {
+            "mean_mse": _extract_mean_mse(evaluation),
+            "overall_kl": _extract_overall_kl(evaluation),
+        }
+
 
 class CausalFlowModel(CausalModelFitter):
     """CausalFlow (CausalMAF) based causal model."""
@@ -279,60 +303,84 @@ class CausalFlowModel(CausalModelFitter):
         """Fit CausalFlow model."""
         logger.info("Fitting CausalFlow model...")
 
-        # For now, use linear mechanisms as placeholder for CausalFlow
-        # TODO: Implement actual CausalFlow when external library is available
-        self.scm = InvertibleStructuralCausalModel(self.graph)
+        # Import the CausalMAFModel
+        from src.causality.causal_flow import CausalMAFModel
 
-        for node in self.graph.nodes:
-            if self.graph.in_degree(node) == 0:
-                mechanism = gcm.EmpiricalDistribution()
-            else:
-                # Placeholder: use linear regression until CausalFlow is implemented
-                mechanism = gcm.AdditiveNoiseModel(
-                    prediction_model=gcm.ml.create_linear_regressor(),
-                    noise_model=gcm.ScipyDistribution(norm),
-                )
-            self.scm.set_causal_mechanism(node, mechanism)
+        # Create CausalMAF model with default parameters
+        # Note: We need to determine the binary_root from the data
+        # For now, we'll assume it's the first binary column or use a default
+        binary_root = self._find_binary_root(train_data)
 
-        gcm.fit(self.scm, train_data)
-        # Use minimal evaluation for faster execution
-        # Use a subset of data for faster evaluation
-        eval_data = train_data.sample(n=min(1000, len(train_data)), random_state=42)
-        evaluation = gcm.evaluate_causal_model(
-            self.scm,
-            eval_data,
-            evaluate_causal_mechanisms=True,  # Keep this for basic metrics
-            compare_mechanism_baselines=False,  # Skip baseline comparison
-            evaluate_invertibility_assumptions=False,  # Skip invertibility tests
-            evaluate_overall_kl_divergence=True,  # Keep KL divergence
-            evaluate_causal_structure=False,  # Skip structure evaluation
+        self.flow_model = CausalMAFModel(
+            graph=self.graph,
+            columns=train_data.columns.tolist(),
+            binary_root=binary_root,
+            hidden_features=(128, 128),  # Default from reference
         )
+
+        # Fit the model with default parameters
+        losses = self.flow_model.fit(train_data)
+
+        # For evaluation, we'll use a simple approach since CausalFlow doesn't use DoWhy's evaluation
+        # We'll generate some samples and compute basic metrics
+        eval_data = train_data.sample(n=min(1000, len(train_data)), random_state=42)
+
+        # Compute test NLL
+        test_nll = self.flow_model.nll(eval_data)
+
+        # Generate samples for evaluation
+        from src.causality.causal_flow import evaluate_flow
+
+        _, summary = evaluate_flow(self.flow_model, eval_data, n_gen=len(eval_data))
+        summary["test_nll"] = test_nll
 
         return {
             "model_type": "causalflow",
-            "evaluation": str(evaluation),
-            "mean_mse": _extract_mean_mse(evaluation),
-            "overall_kl": _extract_overall_kl(evaluation),
+            "evaluation": f"CausalFlow evaluation - NLL: {test_nll:.4f}",
+            "mean_mse": summary.get("mean_mse", 0.0),
+            "overall_kl": summary.get("overall_kl", 0.0),
+            "test_nll": test_nll,
         }
+
+    def _find_binary_root(self, data: pd.DataFrame) -> str:
+        """Find the binary root column in the data."""
+        # Look for columns that contain only 0 and 1 values
+        for col in data.columns:
+            unique_vals = set(data[col].dropna().astype(float))
+            if unique_vals.issubset({0.0, 1.0}):
+                return col
+
+        # If no binary column found, return the first column as fallback
+        logger.warning("No binary column found, using first column as binary_root")
+        return data.columns[0]
 
     def generate_counterfactuals(
         self, test_data: pd.DataFrame, sensitive_name: str
     ) -> pd.DataFrame:
         """Generate counterfactuals using CausalFlow model."""
-        cf_intervention = {sensitive_name: lambda x: 1 - x}
-        df_cf = gcm.counterfactual_samples(
-            self.scm, cf_intervention, observed_data=test_data
-        )
-        df_cf.index = test_data.index.copy()
+        if self.flow_model is None:
+            raise ValueError("Model must be fitted before generating counterfactuals")
 
-        return df_cf[test_data.columns]
+        # Use the CausalMAF model's counterfactual generation
+        return self.flow_model.generate_counterfactuals(test_data)
 
     def evaluate(self, test_data: pd.DataFrame) -> Dict[str, float]:
         """Evaluate CausalFlow model performance."""
-        evaluation = gcm.evaluate_causal_model(self.scm, test_data)
+        if self.flow_model is None:
+            raise ValueError("Model must be fitted before evaluation")
+
+        # Compute test NLL
+        test_nll = self.flow_model.nll(test_data)
+
+        # Generate samples for evaluation
+        from src.causality.causal_flow import evaluate_flow
+
+        _, summary = evaluate_flow(self.flow_model, test_data, n_gen=len(test_data))
+
         return {
-            "mean_mse": _extract_mean_mse(evaluation),
-            "overall_kl": _extract_overall_kl(evaluation),
+            "mean_mse": summary.get("mean_mse", 0.0),
+            "overall_kl": summary.get("overall_kl", 0.0),
+            "test_nll": test_nll,
         }
 
 
