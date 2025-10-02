@@ -45,6 +45,13 @@ def main():
     # Load existing causal worlds
     causal_worlds = load_causal_worlds(DATASET, KNOWLEDGE, BASE_PATH)
 
+    # Parse selected world indexes
+    selected_indexes = parse_world_indexes(args.world_indexes, len(causal_worlds))
+
+    logger.info(f"Total causal worlds available: {len(causal_worlds)}")
+    logger.info(f"Selected world indexes: {selected_indexes}")
+    logger.info(f"Processing {len(selected_indexes)} causal worlds")
+
     # Load adult dataset
     enc_dataset, col_trf = load_dataset_col_trf(DATASET)
 
@@ -61,11 +68,14 @@ def main():
     # Load configuration
     config = load_model_config(args.config, args.model_type)
 
-    # Fit models for each causal world
+    # Fit models for selected causal worlds
     results = []
 
-    for world_idx, causal_world in enumerate(causal_worlds):
-        logger.info(f"Processing causal world {world_idx + 1}/{len(causal_worlds)}")
+    for i, world_idx in enumerate(selected_indexes):
+        causal_world = causal_worlds[world_idx]
+        logger.info(
+            f"Processing causal world {world_idx} ({i+1}/{len(selected_indexes)})"
+        )
 
         try:
             # Create and fit causal model
@@ -120,7 +130,7 @@ def main():
             continue
 
     # Save aggregated results
-    save_results(results, args.output_dir)
+    save_results(results, args.output_dir, selected_indexes)
 
     # Generate summary report
     # generate_summary_report(results, args.output_dir, args.model_type)
@@ -158,7 +168,35 @@ def parse_arguments():
 
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
 
+    parser.add_argument(
+        "--world-indexes",
+        type=str,
+        default=None,
+        help="Comma-separated list of causal world indexes to process (e.g., '0,2,5'). If not specified, process all worlds.",
+    )
+
     return parser.parse_args()
+
+
+def parse_world_indexes(
+    world_indexes_str: Optional[str], total_worlds: int
+) -> List[int]:
+    """Parse world indexes from command line argument."""
+    if world_indexes_str is None:
+        # Return all indexes if none specified
+        return list(range(total_worlds))
+
+    try:
+        indexes = [int(x.strip()) for x in world_indexes_str.split(",")]
+        # Validate indexes
+        for idx in indexes:
+            if idx < 0 or idx >= total_worlds:
+                raise ValueError(
+                    f"World index {idx} is out of range (0-{total_worlds-1})"
+                )
+        return sorted(indexes)
+    except ValueError as e:
+        raise ValueError(f"Invalid world indexes format: {e}")
 
 
 def load_causal_worlds(
@@ -315,15 +353,18 @@ def save_metrics_to_csv(metrics: Dict[str, Any], output_dir: Path, model_type: s
     logger.info(f"Saved metrics to {metrics_file}")
 
 
-def save_results(results: List[Dict], output_dir: Path):
-    """Save aggregated results."""
+def save_results(results: List[Dict], output_dir: Path, selected_indexes: List[int]):
+    """Save aggregated results with used indexes in filename."""
     if not results:
         logger = logging.getLogger(__name__)
         logger.warning("No results to save")
         return
 
     results_df = pd.DataFrame(results)
-    results_path = output_dir / "causal_model_results.csv"
+
+    # Create filename with used indexes
+    indexes_str = "_".join(map(str, selected_indexes))
+    results_path = output_dir / f"causal_model_results_{indexes_str}.csv"
     results_df.to_csv(results_path, index=False)
 
     logger = logging.getLogger(__name__)
