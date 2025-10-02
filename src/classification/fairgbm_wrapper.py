@@ -6,6 +6,7 @@ from typing import Optional, Tuple
 import numpy as np
 import pandas as pd
 from sklearn.base import ClassifierMixin
+from sklearn.model_selection import train_test_split
 
 from src.dataset.dataset_wrappers import EncodedDatasetWrapper
 from src.metrics.model_metrics import evaluate_group_fairness, evaluate_performance
@@ -184,16 +185,9 @@ def fit_fairgbm_classifier(
     X_test = enc_dataset.X_enc_test.copy()
 
     # Handle sensitive attribute inclusion/exclusion
-    if "no_sensitive" in model_tag:
-        logger.info(
-            f"Dropping {enc_dataset.enc_sensitive_name} for model tag {model_tag}"
-        )
-        X_train = X_train.drop(columns=enc_dataset.enc_sensitive_name)
-        X_test = X_test.drop(columns=enc_dataset.enc_sensitive_name)
-        # For FAIRGBM without sensitive features, we can't use fairness constraints
-        logger.warning(
-            "FAIRGBM without sensitive features will not enforce fairness constraints"
-        )
+    logger.info(f"Dropping {enc_dataset.enc_sensitive_name} for model tag {model_tag}")
+    X_train = X_train.drop(columns=enc_dataset.enc_sensitive_name)
+    X_test = X_test.drop(columns=enc_dataset.enc_sensitive_name)
 
     # Convert sensitive attributes to numeric format for FAIRGBM
     # FAIRGBM requires numeric sensitive attributes (0, 1)
@@ -208,14 +202,13 @@ def fit_fairgbm_classifier(
         )
 
     # Map to 0 and 1
-    value_map = {unique_values[0]: 0, unique_values[1]: 1}
+    value_map = {"Female": 0, "Male": 1}
     s_train_numeric = s_train_numeric.map(value_map).astype(int)
     s_test_numeric = s_test_numeric.map(value_map).astype(int)
 
     logger.info(f"Converted sensitive attributes: {value_map}")
 
     # Create validation split from training data
-    from sklearn.model_selection import train_test_split
 
     (
         X_train_split,
@@ -249,41 +242,15 @@ def fit_fairgbm_classifier(
         seed=seed,
     )
 
-    # Fit with hyperparameter tuning
-    if "no_sensitive" in model_tag:
-        # For no_sensitive case, we can't use fairness constraints in hyperparameter tuning
-        # Use a simple approach without hyperparameter tuning for fairness
-        logger.warning(
-            "No_sensitive FAIRGBM models will use default parameters (no hyperparameter tuning for fairness)"
-        )
-
-        # Create a simple FairGBMClassifier with default parameters
-        from fairgbm import FairGBMClassifier
-
-        classifier = FairGBMClassifier(
-            n_estimators=100,
-            learning_rate=0.1,
-            num_leaves=31,
-            max_depth=-1,
-            min_child_samples=20,
-            reg_alpha=0.0,
-            reg_lambda=0.0,
-            boosting_type="gbdt",
-            random_state=seed,
-            verbose=-1,
-        )
-        classifier.fit(X_train_split, y_train_split)
-        best_params = {}
-    else:
-        # Fit with hyperparameter tuning for fairness-aware models
-        classifier, best_params = fairgbm_wrapper.fit_with_tuning(
-            X_train_split,
-            y_train_split,
-            s_train_split,
-            X_val_split,
-            y_val_split,
-            s_val_split,
-        )
+    # Fit with hyperparameter tuning for fairness-aware models
+    classifier, best_params = fairgbm_wrapper.fit_with_tuning(
+        X_train_split,
+        y_train_split,
+        s_train_split,
+        X_val_split,
+        y_val_split,
+        s_val_split,
+    )
 
     # Make predictions on test set
     y_pred = pd.Series(
@@ -325,21 +292,6 @@ def fit_fairgbm_classifier(
         # Save best parameters
         with open(output_dir / "best_hyperparameters.json", "w") as f:
             json.dump(best_params, f, indent=4)
-    elif "no_sensitive" in model_tag:
-        # Save default parameters for no_sensitive models
-        default_params = {
-            "n_estimators": 100,
-            "learning_rate": 0.1,
-            "num_leaves": 31,
-            "max_depth": -1,
-            "min_child_samples": 20,
-            "reg_alpha": 0.0,
-            "reg_lambda": 0.0,
-            "boosting_type": "gbdt",
-            "note": "Default parameters used for no_sensitive model (no hyperparameter tuning)",
-        }
-        with open(output_dir / "best_hyperparameters.json", "w") as f:
-            json.dump(default_params, f, indent=4)
 
     # Save the trained model
     with open(output_dir / "fairgbm_model.pkl", "wb") as f:

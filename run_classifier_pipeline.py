@@ -51,6 +51,7 @@ def parse_cli():
             "FAIRGBM_equal_opportunity",
             "FAIRGBM_predictive_equality",
             # Add FairLearn options
+            "FAIRLEARN",
             "FAIRLEARN_LR",
             "FAIRLEARN_RF",
             "FAIRLEARN_GB",
@@ -162,7 +163,7 @@ if __name__ == "__main__":
     score_var_by_indiv = (
         mw_counterfactuals.scores.groupby(level="individual")  # type: ignore
         .var()
-        .rename("score_variance_by_individual")
+        .rename("score_variance_by_individual")  # type: ignore
     )
 
     score_var_by_indiv.to_csv(

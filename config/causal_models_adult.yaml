@@ -1,0 +1,37 @@
+# Configuration for causal models optimized for adult dataset with medium knowledge
+
+linear:
+  # Linear model parameters
+  random_state: 42
+  fit_intercept: true
+
+lgbm:
+  # LGBM parameters optimized for adult dataset
+  max_depth: 6
+  learning_rate: 0.1
+  n_estimators: 100
+  random_state: 42
+  subsample: 0.8
+  colsample_bytree: 0.8
+
+diffusion:
+  # Diffusion model parameters
+  num_epochs: 100
+  verbose: true
+  use_gpu_if_available: false
+  learning_rate: 0.001
+  batch_size: 64
+  noise_schedule: "linear"
+  num_timesteps: 1000
+
+causalflow:
+  # CausalFlow parameters optimized for adult dataset
+  hidden_features: [128, 128]
+  epochs: 200
+  lr: 0.001
+  batch_size: 512
+  val_split: 0.2
+  patience: 50
+  warmup_steps: 1000
+  seed: 42
+  weight_decay: 1e-6

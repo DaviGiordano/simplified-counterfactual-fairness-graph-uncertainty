@@ -39,9 +39,6 @@ def fit_evaluate_classifier(
         "LR": LogisticRegression,
         "RF": RandomForestClassifier,
         "GB": GradientBoostingClassifier,
-        "LR_no_sensitive": LogisticRegression,
-        "RF_no_sensitive": RandomForestClassifier,
-        "GB_no_sensitive": GradientBoostingClassifier,
     }
 
     # Handle FAIRGBM models
@@ -65,12 +62,9 @@ def fit_evaluate_classifier(
     df_train = enc_dataset.X_enc_train.copy()
     df_test = enc_dataset.X_enc_test.copy()
 
-    if "no_sensitive" in model_tag:
-        logger.info(
-            f"Dropping {enc_dataset.enc_sensitive_name} for model tag {model_tag}"
-        )
-        df_train.drop(columns=enc_dataset.enc_sensitive_name, inplace=True)
-        df_test.drop(columns=enc_dataset.enc_sensitive_name, inplace=True)
+    logger.info(f"Dropping {enc_dataset.enc_sensitive_name} for model tag {model_tag}")
+    df_train.drop(columns=enc_dataset.enc_sensitive_name, inplace=True)
+    df_test.drop(columns=enc_dataset.enc_sensitive_name, inplace=True)
 
     classifier.fit(
         df_train,

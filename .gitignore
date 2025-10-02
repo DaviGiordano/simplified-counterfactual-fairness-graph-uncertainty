@@ -11,3 +11,6 @@ output/*
 *.txt
 *.csv
 *.pkl
+output/*
+output_backup/*
+data/*
