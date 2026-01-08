@@ -1,11 +1,10 @@
 import logging
 import pickle
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Tuple
 
 import numpy as np
 import pandas as pd
-import yaml
 from sklearn.base import ClassifierMixin
 
 from src.dataset.dataset_wrappers import EncodedDatasetWrapper
@@ -22,21 +21,14 @@ except ImportError:
     logger.warning("FAIRGBM not available. Install with: pip install fairgbm")
 
 
-def get_config_path(model_tag: str) -> Path:
-    """Map model tag to appropriate config file."""
+def get_constraint_type(model_tag: str) -> str:
+    """Determine constraint type from model tag."""
     if "equal_opportunity" in model_tag:
-        return Path("config/fairgbm/equal_opportunity.yaml")
+        return "FNR"  # equal opportunity
     elif "predictive_equality" in model_tag:
-        return Path("config/fairgbm/predictive_equality.yaml")
+        return "FPR"  # predictive equality
     else:
-        return Path("config/fairgbm/equalized_odds.yaml")
-
-
-def load_config(config_path: Path) -> dict:
-    """Load configuration from YAML file."""
-    with open(config_path, "r") as f:
-        config = yaml.safe_load(f)
-    return config
+        return "FNR,FPR"  # equalized odds (default)
 
 
 def fit_fairgbm_simple(
@@ -87,47 +79,22 @@ def fit_fairgbm_simple(
 
     logger.info(f"Converted sensitive attributes: {value_map}")
 
-    # Load configuration from YAML file
-    config_path = get_config_path(model_tag)
-    config = load_config(config_path)
+    # Get constraint type from model tag
+    constraint_type = get_constraint_type(model_tag)
+    logger.info(f"Using constraint type: {constraint_type}")
 
-    # Extract constraint type from config file
-    fairgbm_config = config.get("FairGBM", {})
-    kwargs_config = fairgbm_config.get("kwargs", {})
-    constraint_type_options = kwargs_config.get("constraint_type", ["FNR,FPR"])
-
-    # Use the first constraint type (config files should have only one)
-    constraint_type = (
-        constraint_type_options[0]
-        if isinstance(constraint_type_options, list)
-        else constraint_type_options
-    )
-
-    logger.info(f"Using constraint type from config: {constraint_type}")
-
-    # Helper function to extract single value from config (handle lists and search spaces)
-    def get_single_value(key, default):
-        value = kwargs_config.get(key, default)
-        if isinstance(value, list):
-            return value[0]  # Take first value from list
-        elif isinstance(value, dict):
-            # This is a hyperparameter search space, use default
-            return default
-        return value
-
-    # Initialize FAIRGBM with parameters from config file
-    # Use reasonable defaults for parameters not specified in config
+    # Initialize FAIRGBM with default parameters
     classifier = FairGBMClassifier(
-        n_estimators=get_single_value("n_estimators", 100),
+        n_estimators=100,
         constraint_type=constraint_type,
-        multiplier_learning_rate=get_single_value("multiplier_learning_rate", 0.1),
-        learning_rate=get_single_value("learning_rate", 0.1),
-        num_leaves=get_single_value("num_leaves", 31),
-        max_depth=get_single_value("max_depth", -1),
-        min_child_samples=get_single_value("min_child_samples", 20),
-        reg_alpha=get_single_value("reg_alpha", 0.0),
-        reg_lambda=get_single_value("reg_lambda", 0.0),
-        boosting_type=get_single_value("boosting_type", "gbdt"),
+        multiplier_learning_rate=0.1,
+        learning_rate=0.1,
+        num_leaves=31,
+        max_depth=-1,
+        min_child_samples=20,
+        reg_alpha=0.0,
+        reg_lambda=0.0,
+        boosting_type="gbdt",
         random_state=42,
         verbose=-1,  # Suppress output
     )

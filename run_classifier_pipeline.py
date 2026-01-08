@@ -65,42 +65,6 @@ def parse_cli():
         ],
         required=True,
     )
-    # Add FAIRGBM-specific arguments
-    p.add_argument(
-        "--fairgbm-config",
-        type=str,
-        help="Path to FAIRGBM hyperparameter configuration file",
-    )
-    p.add_argument(
-        "--fairgbm-trials",
-        type=int,
-        default=20,
-        help="Number of hyperparameter tuning trials for FAIRGBM (advanced wrapper with Optuna)",
-    )
-    p.add_argument(
-        "--fairgbm-jobs",
-        type=int,
-        default=1,
-        help="Number of parallel jobs for FAIRGBM hyperparameter tuning (advanced wrapper)",
-    )
-    # Add FairLearn-specific arguments
-    p.add_argument(
-        "--fairlearn-config",
-        type=str,
-        help="Path to FairLearn hyperparameter configuration file",
-    )
-    p.add_argument(
-        "--fairlearn-trials",
-        type=int,
-        default=20,
-        help="Number of hyperparameter tuning trials for FairLearn",
-    )
-    p.add_argument(
-        "--fairlearn-jobs",
-        type=int,
-        default=1,
-        help="Number of parallel jobs for FairLearn hyperparameter tuning",
-    )
     return p.parse_args()
 
 
@@ -131,27 +95,8 @@ if __name__ == "__main__":
 
     enc_dataset, col_trf = load_dataset_col_trf(args.dataset)
 
-    # Prepare FAIRGBM-specific arguments
-    fairgbm_kwargs = {}
-    if args.classifier.startswith("FAIRGBM"):
-        if args.fairgbm_config:
-            fairgbm_kwargs["config_path"] = Path(args.fairgbm_config)
-        fairgbm_kwargs["n_trials"] = args.fairgbm_trials
-        fairgbm_kwargs["n_jobs"] = args.fairgbm_jobs
-
-    # Prepare FairLearn-specific arguments
-    fairlearn_kwargs = {}
-    if args.classifier.startswith("FAIRLEARN"):
-        if args.fairlearn_config:
-            fairlearn_kwargs["config_path"] = Path(args.fairlearn_config)
-        fairlearn_kwargs["n_trials"] = args.fairlearn_trials
-        fairlearn_kwargs["n_jobs"] = args.fairlearn_jobs
-
-    # Combine all kwargs
-    all_kwargs = {**fairgbm_kwargs, **fairlearn_kwargs}
-
     classifier, y_pred = fit_evaluate_classifier(
-        args.classifier, enc_dataset, model_metrics_output_dir, **all_kwargs
+        args.classifier, enc_dataset, model_metrics_output_dir
     )
     mw_counterfactuals.evaluate_counterfactual_fairness(
         classifier,

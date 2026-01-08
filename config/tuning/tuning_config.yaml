@@ -1,0 +1,31 @@
+tuning:
+  optimizer: optuna
+  n_trials: 20  # 20 trials for comprehensive tuning
+  timeout: 1800  # 30 minutes timeout
+  cv_folds: 5   # 5-fold cross-validation
+  random_state: 42
+  
+# Default objectives (can be overridden per classifier)
+objectives:
+  lr: f1_score
+  rf: f1_score
+  gb: f1_score
+  fairgbm: 
+    primary: f1_score
+    secondary: equalized_odds_difference
+    weights: [0.7, 0.3]
+  
+pruning:
+  enabled: true
+  patience: 10
+  
+parallel:
+  enabled: true
+  n_jobs: 4
+  
+# MLflow configuration
+mlflow:
+  experiment_name: hyperparameter_tuning
+  tracking_uri: file:./mlruns
+  log_models: true
+  log_artifacts: true

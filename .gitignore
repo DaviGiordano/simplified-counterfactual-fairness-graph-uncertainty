@@ -8,7 +8,6 @@
 .vscode/*
 output/*
 *.dot
-*.txt
 *.csv
 *.pkl
 output/*

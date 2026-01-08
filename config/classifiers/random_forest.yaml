@@ -1,0 +1,29 @@
+RandomForestClassifier:
+  classpath: sklearn.ensemble.RandomForestClassifier
+  optimization_objective: f1_score
+  search_space:
+    n_estimators:
+      type: int
+      range: [10, 200]
+      log: false
+    max_depth:
+      type: int
+      range: [1, 30]
+      log: false
+    min_samples_split:
+      type: int
+      range: [2, 20]
+      log: false
+    min_samples_leaf:
+      type: int
+      range: [1, 20]
+      log: false
+    max_features:
+      type: float
+      range: [0.1, 1.0]
+      log: false
+    criterion:
+      - gini
+      - entropy
+  default_params:
+    random_state: 42

@@ -1,0 +1,12 @@
+LogisticRegression:
+  classpath: sklearn.linear_model.LogisticRegression
+  optimization_objective: f1_score
+  search_space:
+    C:
+      type: float
+      range: [1e-5, 1e5]
+      log: true
+  default_params:
+    random_state: 42
+    solver: lbfgs
+    penalty: l2

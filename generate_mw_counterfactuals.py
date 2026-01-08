@@ -72,24 +72,24 @@ if __name__ == "__main__":
         col_trf,
         args.num_samples,
     )
-    mw_counterfactuals = generate_counterfactuals_from_worlds(
-        enc_dataset.X_enc_train,
-        causal_worlds,
-        enc_dataset.X_enc_test,
-        enc_dataset.enc_sensitive_name,
-        args.num_workers,
-    )
-    mw_counterfactuals.evaluate_counterfactuals_quality(
-        enc_dataset.X_enc_test,
-        enc_dataset.sensitive_test,
-        args.num_workers,
-    )
+    # mw_counterfactuals = generate_counterfactuals_from_worlds(
+    #     enc_dataset.X_enc_train,
+    #     causal_worlds,
+    #     enc_dataset.X_enc_test,
+    #     enc_dataset.enc_sensitive_name,
+    #     args.num_workers,
+    # )
+    # mw_counterfactuals.evaluate_counterfactuals_quality(
+    #     enc_dataset.X_enc_test,
+    #     enc_dataset.sensitive_test,
+    #     args.num_workers,
+    # )
 
     output_path.mkdir(parents=True, exist_ok=True)
 
-    with open(output_path / "mw_counterfactuals.pkl", "wb") as f:
-        pickle.dump(mw_counterfactuals, f)
-    with open(output_path / "causal_worlds.pkl", "wb") as f:
+    # with open(output_path / "mw_counterfactuals.pkl", "wb") as f:
+    #     pickle.dump(mw_counterfactuals, f)
+    with open(output_path / "./new_causal_worlds.pkl", "wb") as f:
         pickle.dump(causal_worlds, f)
 
     logger.info("Finish: Counterfactual generation ended!")

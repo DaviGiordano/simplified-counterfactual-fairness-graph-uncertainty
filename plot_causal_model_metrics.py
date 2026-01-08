@@ -146,6 +146,18 @@ def plot_causal_model_metrics(df: pd.DataFrame, output_dir: Path):
     """Create bar charts comparing causal model metrics across fitting mechanisms."""
     set_pub_theme()
 
+    # Mechanism name mapping
+    mechanism_names = {
+        "linear": "Linear",
+        "diffusion": "DCM",
+        "causalflow": "CNF",
+        "lgbm": "LGBM",
+    }
+
+    # Apply mechanism name mapping
+    df = df.copy()
+    df["model_type"] = df["model_type"].replace(mechanism_names)
+
     # Compute average metrics
     df["avg_coverage"] = (df["coverage_0"] + df["coverage_1"]) / 2
     df["avg_density"] = (df["density_0"] + df["density_1"]) / 2
@@ -183,9 +195,9 @@ def plot_causal_model_metrics(df: pd.DataFrame, output_dir: Path):
         print(f"📊 Plotting {metric}...")
 
         # Create figure following the style guidelines
-        fig, ax = plt.subplots(figsize=(4, 4), dpi=300)
+        fig, ax = plt.subplots(figsize=(2.5, 3.5), dpi=300)
 
-        # Let seaborn handle the aggregation and CI calculation with capsize=0.1
+        # Let seaborn handle the aggregation and CI calculation with capsize=0.2
         bars = sns.barplot(
             data=df,
             x=metric,
@@ -193,19 +205,32 @@ def plot_causal_model_metrics(df: pd.DataFrame, output_dir: Path):
             color="steelblue",
             orient="h",
             errorbar="ci",  # Let seaborn calculate confidence intervals
-            capsize=0.1,  # Very small caps
+            capsize=0.2,  # Increased cap size for better spacing
         )
 
-        # Add value labels on bars
+        # Add value labels on bars with more padding
         for cont in bars.containers:
-            bars.bar_label(cont, fmt="%.3f", padding=3)
+            # Extra padding for outlier rate to prevent text overlap
+            padding = 8 if metric == "overall_outlier_percent" else 5
+            bars.bar_label(cont, fmt="%.3f", padding=padding)  # type: ignore[arg-type]
 
         # Customize the plot
-        ax.set_xlabel(f"Mean {metric.replace('_', ' ').title()}")
-        ax.set_ylabel("Fitting Mechanism")
-        ax.set_title(
-            f"Mean {metric.replace('_', ' ').title()} by Fitting Mechanism", pad=20
-        )
+        metric_display_name = metric.replace("_", " ").title()
+        # Fix specific metric names
+        if metric == "mean_mse":
+            metric_display_name = "MSE"
+        elif metric == "overall_outlier_percent":
+            metric_display_name = "Outlier Rate"
+        elif metric == "avg_coverage":
+            metric_display_name = "Coverage"
+        elif metric == "avg_density":
+            metric_display_name = "Density"
+        elif metric == "overall_kl":
+            metric_display_name = "KL Divergence"
+
+        ax.set_xlabel(f"Average {metric_display_name} ± 95% CI")
+        ax.set_ylabel("Causal Model")
+        ax.set_title(f"{metric_display_name} by Causal Model", pad=20)
 
         # Clean styling
         sns.despine()
@@ -235,8 +260,8 @@ def create_summary_plot(df: pd.DataFrame, output_dir: Path, model_colors: dict):
         "avg_coverage",
     ]
 
-    # Create subplots
-    fig, axes = plt.subplots(2, 3, figsize=(12, 8), dpi=300)
+    # Create 2x2 subplots with A4 aspect ratio (4x4)
+    fig, axes = plt.subplots(2, 2, figsize=(4, 4), dpi=300)
     axes = axes.flatten()
 
     for i, metric in enumerate(metrics):
@@ -256,7 +281,7 @@ def create_summary_plot(df: pd.DataFrame, output_dir: Path, model_colors: dict):
             )
             continue
 
-        # Let seaborn handle the aggregation and CI calculation with capsize=0.1
+        # Let seaborn handle the aggregation and CI calculation with capsize=0.2
         bars = sns.barplot(
             data=df,
             x=metric,
@@ -264,30 +289,39 @@ def create_summary_plot(df: pd.DataFrame, output_dir: Path, model_colors: dict):
             color="steelblue",
             orient="h",
             errorbar="ci",  # Let seaborn calculate confidence intervals
-            capsize=0.1,  # Very small caps
+            capsize=0.2,  # Increased cap size for better spacing
             ax=ax,
         )
 
-        # Add value labels on bars
+        # Add value labels on bars with more padding
         for cont in bars.containers:
-            bars.bar_label(cont, fmt="%.3f", padding=3, fontsize=8)
+            # Extra padding for outlier rate to prevent text overlap
+            padding = 8 if metric == "overall_outlier_percent" else 5
+            bars.bar_label(cont, fmt="%.3f", padding=padding, fontsize=8)  # type: ignore[arg-type]
 
         # Customize subplot
-        ax.set_title(f"{metric.replace('_', ' ').title()}", fontsize=10)
-        ax.set_xlabel("")
-        ax.set_ylabel("")
+        metric_display_name = metric.replace("_", " ").title()
+        # Fix specific metric names
+        if metric == "mean_mse":
+            metric_display_name = "MSE"
+        elif metric == "overall_outlier_percent":
+            metric_display_name = "Outlier Rate"
+        elif metric == "avg_coverage":
+            metric_display_name = "Coverage"
+        elif metric == "avg_density":
+            metric_display_name = "Density"
+        elif metric == "overall_kl":
+            metric_display_name = "KL Divergence"
+
+        ax.set_title(f"{metric_display_name} by Causal Model", fontsize=10)
+        ax.set_xlabel(f"Average {metric_display_name} ± 95% CI")
+        ax.set_ylabel("Causal Model")
 
         # Clean styling
         sns.despine(ax=ax)
 
-    # Remove empty subplots
-    for i in range(len(metrics), len(axes)):
-        fig.delaxes(axes[i])
-
     # Add overall title
-    fig.suptitle(
-        "Causal Model Metrics Comparison Across Fitting Mechanisms", fontsize=14, y=0.98
-    )
+    fig.suptitle("Causal Model Metrics Comparison", fontsize=14, y=0.98)
 
     plt.tight_layout()
 
@@ -302,6 +336,22 @@ def create_summary_plot(df: pd.DataFrame, output_dir: Path, model_colors: dict):
 def create_metrics_summary_table(df: pd.DataFrame, output_dir: Path):
     """Create a summary table of all metrics."""
     print("📊 Creating metrics summary table...")
+
+    # Mechanism name mapping
+    mechanism_names = {
+        "linear": "Linear",
+        "diffusion": "DCM",
+        "causalflow": "CNF",
+        "lgbm": "LGBM",
+    }
+
+    # Apply mechanism name mapping
+    df = df.copy()
+    df["model_type"] = df["model_type"].replace(mechanism_names)
+
+    # Compute average metrics (same as in plot_causal_model_metrics)
+    df["avg_coverage"] = (df["coverage_0"] + df["coverage_1"]) / 2
+    df["avg_density"] = (df["density_0"] + df["density_1"]) / 2
 
     metrics = [
         "mean_mse",
@@ -322,16 +372,50 @@ def create_metrics_summary_table(df: pd.DataFrame, output_dir: Path):
             if metric in model_data.columns:
                 values = model_data[metric]
                 row[f"{metric}_mean"] = values.mean()
-                row[f"{metric}_std"] = values.std()
+                row[f"{metric}_ci_lower"] = float(
+                    np.quantile(np.asarray(values), 0.025)
+                )
+                row[f"{metric}_ci_upper"] = float(
+                    np.quantile(np.asarray(values), 0.975)
+                )
                 row[f"{metric}_count"] = len(values)
             else:
                 row[f"{metric}_mean"] = np.nan
-                row[f"{metric}_std"] = np.nan
+                row[f"{metric}_ci_lower"] = np.nan
+                row[f"{metric}_ci_upper"] = np.nan
                 row[f"{metric}_count"] = 0
 
         summary_data.append(row)
 
     summary_df = pd.DataFrame(summary_data)
+
+    # Compute rank-based composite score (weighted average of ranks)
+    # Lower is better for MSE, Outlier Rate, KL; higher is better for Density, Coverage
+    summary_df["rank_mse"] = summary_df["mean_mse_mean"].rank(
+        ascending=True, method="average"
+    )
+    summary_df["rank_outlier"] = summary_df["overall_outlier_percent_mean"].rank(
+        ascending=True, method="average"
+    )
+    summary_df["rank_kl"] = summary_df["overall_kl_mean"].rank(
+        ascending=True, method="average"
+    )
+    summary_df["rank_density"] = summary_df["avg_density_mean"].rank(
+        ascending=False, method="average"
+    )
+    summary_df["rank_coverage"] = summary_df["avg_coverage_mean"].rank(
+        ascending=False, method="average"
+    )
+
+    # Weighted average: weight 2 for MSE
+    total_weight = 2 + 1 + 1 + 1 + 1
+    summary_df["composite_score"] = (
+        summary_df["rank_mse"]
+        + summary_df["rank_outlier"]
+        + summary_df["rank_kl"]
+        + summary_df["rank_density"]
+        + summary_df["rank_coverage"]
+    ) / float(total_weight)
 
     # Save to CSV
     summary_path = output_dir / "causal_model_metrics_summary.csv"
@@ -344,10 +428,48 @@ def create_metrics_summary_table(df: pd.DataFrame, output_dir: Path):
     print("=" * 80)
     print(summary_df.to_string(index=False, float_format="%.4f"))
 
+    # Save model ranking by composite score to TXT
+    ranking_df = summary_df[["Fitting_Mechanism", "composite_score"]].copy()
+    ranking_df = ranking_df.sort_values(by=["composite_score"], ascending=True).reset_index(drop=True)  # type: ignore[call-arg]
+    ranking_df.index = ranking_df.index + 1  # start rank at 1
+
+    ranking_lines = [
+        "Model ranking by weighted average rank (lower is better)",
+        "Weights: MSE x2; Outlier, KL, Density, Coverage x1",
+        "=" * 70,
+        "",
+    ]
+    for rank, row in ranking_df.iterrows():
+        ranking_lines.append(
+            f"{rank:2d}. {row['Fitting_Mechanism']}: {row['composite_score']:.4f}"
+        )
+
+    ranking_txt_path = output_dir / "model_ranking.txt"
+    with open(ranking_txt_path, "w") as f:
+        f.write("\n".join(ranking_lines))
+
+    print(f"\n🏁 Saved model ranking: {ranking_txt_path}")
+
 
 def save_metrics_with_ci_to_txt(df: pd.DataFrame, output_dir: Path):
     """Save mean values and 95% confidence intervals to a text file."""
     print("📊 Creating metrics with CI text file...")
+
+    # Mechanism name mapping
+    mechanism_names = {
+        "linear": "Linear",
+        "diffusion": "DCM",
+        "causalflow": "CNF",
+        "lgbm": "LGBM",
+    }
+
+    # Apply mechanism name mapping
+    df = df.copy()
+    df["model_type"] = df["model_type"].replace(mechanism_names)
+
+    # Compute average metrics (same as in plot_causal_model_metrics)
+    df["avg_coverage"] = (df["coverage_0"] + df["coverage_1"]) / 2
+    df["avg_density"] = (df["density_0"] + df["density_1"]) / 2
 
     metrics = [
         "mean_mse",
@@ -378,12 +500,10 @@ def save_metrics_with_ci_to_txt(df: pd.DataFrame, output_dir: Path):
             model_data = df[df["model_type"] == model_type][metric]
             if len(model_data) > 0:
                 mean_val = model_data.mean()
-                std_val = model_data.std()
                 n = len(model_data)
-                # 95% CI using t-distribution
-                ci_margin = 1.96 * std_val / np.sqrt(n) if n > 1 else 0
-                ci_low = mean_val - ci_margin
-                ci_high = mean_val + ci_margin
+                # 95% CI using quantiles
+                ci_low = float(np.quantile(np.asarray(model_data), 0.025))
+                ci_high = float(np.quantile(np.asarray(model_data), 0.975))
 
                 lines.append(
                     f"  {model_type:12s}: {mean_val:.4f} [{ci_low:.4f}, {ci_high:.4f}] (n={n})"

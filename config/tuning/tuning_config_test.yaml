@@ -1,0 +1,26 @@
+mlflow:
+  experiment_name: hyperparameter_tuning_test
+  log_artifacts: false
+  log_models: false
+  tracking_uri: file:./mlruns
+objectives:
+  fairgbm:
+    primary: f1_score
+    secondary: equalized_odds_difference
+    weights:
+    - 0.7
+    - 0.3
+  gb: f1_score
+  lr: f1_score
+  rf: f1_score
+parallel:
+  enabled: false
+pruning:
+  enabled: false
+tuning:
+  cv_folds: 2
+  n_trials: 3
+  optimizer: optuna
+  random_state: 42
+  timeout: 60
+

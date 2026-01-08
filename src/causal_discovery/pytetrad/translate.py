@@ -2,11 +2,14 @@
 ## start the JVM only once per session. Your code should start with the following
 ## lines:
 #
+import importlib.resources as importlib_resources
+
 import jpype
 import jpype.imports
 
-import importlib.resources as importlib_resources
-jar_path = importlib_resources.files('pytetrad').joinpath('resources','tetrad-current.jar')
+jar_path = importlib_resources.files("pytetrad").joinpath(
+    "resources", "tetrad-current.jar"
+)
 jar_path = str(jar_path)
 if not jpype.isJVMStarted():
     try:
@@ -17,20 +20,22 @@ if not jpype.isJVMStarted():
 
 ## Some functions wrapping various classes in Tetrad. Feel free to just steal
 ## the relevant code for your own projects, or 'pip install' this Github directory
-## and call these functions. will add more named parameters to help one see which 
+## and call these functions. will add more named parameters to help one see which
 ## methods for the the searches can be controlled.
 
 # # this needs to happen before import pytetrad (otherwise lib cant be found)
-# BASE_DIR = os.path.join(os.path.dirname(__file__), '../..')
+# import os
+# import sys
+
+# BASE_DIR = os.path.join(os.path.dirname(__file__), "../..")
 # sys.path.append(BASE_DIR)
 
+import edu.cmu.tetrad.data as td
+import edu.cmu.tetrad.graph as tg
+import java.util as util
 import numpy as np
 import pandas as pd
 from pandas import DataFrame
-
-import java.util as util
-import edu.cmu.tetrad.data as td
-import edu.cmu.tetrad.graph as tg
 
 
 def pandas_data_to_tetrad(df: DataFrame, int_as_cont=False):
@@ -41,7 +46,9 @@ def pandas_data_to_tetrad(df: DataFrame, int_as_cont=False):
             dtypes.append(f"uint{2 ** i}")
     cols = df.columns
     discrete_cols = [col for col in cols if df[col].dtypes not in dtypes]
-    category_map = {col: {val: i for i, val in enumerate(df[col].unique())} for col in discrete_cols}
+    category_map = {
+        col: {val: i for i, val in enumerate(df[col].unique())} for col in discrete_cols
+    }
     df = df.replace(category_map)
     values = df.values
     n, p = df.shape
@@ -85,13 +92,16 @@ def tetrad_data_to_pandas(data: td.DataSet):
 
     return df
 
+
 ## The defaults here are for the PCALG style of general graph endpoint matrices, but
 ## the user can use whichever endpoint encoding they like.
-def graph_to_matrix(g, nullEpt = 0, circleEpt = 1, arrowEpt = 2, tailEpt = 3):
-    endpoint_map = {"NULL": nullEpt,
-                    "CIRCLE": circleEpt,
-                    "ARROW": arrowEpt,
-                    "TAIL": tailEpt}
+def graph_to_matrix(g, nullEpt=0, circleEpt=1, arrowEpt=2, tailEpt=3):
+    endpoint_map = {
+        "NULL": nullEpt,
+        "CIRCLE": circleEpt,
+        "ARROW": arrowEpt,
+        "TAIL": tailEpt,
+    }
 
     nodes = g.getNodes()
     p = g.getNumNodes()
@@ -110,6 +120,7 @@ def graph_to_matrix(g, nullEpt = 0, circleEpt = 1, arrowEpt = 2, tailEpt = 3):
 
     return pd.DataFrame(A, columns=columns_)
 
+
 def tetrad_matrix_to_numpy(array):
     # print(array)
     #
@@ -124,10 +135,12 @@ def tetrad_matrix_to_numpy(array):
 
     return np_array
 
+
 def tetrad_matrix_to_pandas(array, variables):
     np_array = tetrad_matrix_to_numpy(array)
     columns = [str(variables.get(i)) for i in range(array.getNumColumns())]
     return pd.DataFrame(np_array, columns=columns)
+
 
 # Input a square int[][] array with only 0's and 1's, where a[i][j] = 1 just in case
 # j->i. Returns a Java graph object for this.
@@ -147,7 +160,7 @@ def adj_matrix_to_graph(adjMatrix):
 
     for i, row in enumerate(adjMatrix):
         for j, value in enumerate(row):
-            if (adjMatrix[i][j]):
+            if adjMatrix[i][j]:
                 graph.addDirectedEdge(variables.get(i), variables.get(j))
 
     return graph
@@ -155,16 +168,16 @@ def adj_matrix_to_graph(adjMatrix):
 
 # PASS ME A GraphViz Graph object and call it gdot!
 def write_gdot(g, gdot):
-    endpoint_map = {"TAIL": "none",
-                    "ARROW": "empty",
-                    "CIRCLE": "odot"}
+    endpoint_map = {"TAIL": "none", "ARROW": "empty", "CIRCLE": "odot"}
 
     for node in g.getNodes():
-        gdot.node(str(node.getName()),
-                  shape='circle',
-                  fixedsize='true',
-                  style='filled',
-                  color='lightgray')
+        gdot.node(
+            str(node.getName()),
+            shape="circle",
+            fixedsize="true",
+            style="filled",
+            color="lightgray",
+        )
 
     for edge in g.getEdges():
         node1 = str(edge.getNode1().getName())
@@ -172,13 +185,19 @@ def write_gdot(g, gdot):
         endpoint1 = str(endpoint_map[edge.getEndpoint1().name()])
         endpoint2 = str(endpoint_map[edge.getEndpoint2().name()])
         color = "blue"
-        if (endpoint1 == "empty") and (endpoint2 == "empty"): color = "red"
-        gdot.edge(node1, node2,
-                  arrowtail=endpoint1,
-                  arrowhead=endpoint2,
-                  dir='both', color=color)
+        if (endpoint1 == "empty") and (endpoint2 == "empty"):
+            color = "red"
+        gdot.edge(
+            node1,
+            node2,
+            arrowtail=endpoint1,
+            arrowhead=endpoint2,
+            dir="both",
+            color=color,
+        )
 
     return gdot
+
 
 # Prints a Java graph object as a Tetrad-style string. Needed from R.
 def print_java(java_graph: tg.Graph):

@@ -1,0 +1,47 @@
+FairGBMClassifier:
+  classpath: fairgbm.FairGBMClassifier
+  optimization_objective: multi_objective
+  objectives:
+    primary: f1_score
+    secondary: equalized_odds_difference
+    weights: [0.7, 0.3]
+  search_space:
+    n_estimators:
+      type: int
+      range: [50, 500]
+      log: false
+    num_leaves:
+      type: int
+      range: [4, 32]
+      log: false
+    min_child_samples:
+      type: int
+      range: [5, 100]
+      log: false
+    max_depth:
+      type: int
+      range: [3, 15]
+      log: false
+    learning_rate:
+      type: float
+      range: [0.01, 0.5]
+      log: true
+    reg_alpha:
+      type: float
+      range: [0.0001, 0.1]
+      log: true
+    reg_lambda:
+      type: float
+      range: [0.0001, 0.1]
+      log: true
+    boosting_type:
+      - goss
+      - gbdt
+    multiplier_learning_rate:
+      type: float
+      range: [0.005, 0.5]
+      log: true
+  default_params:
+    n_jobs: 1
+    random_state: 42
+    constraint_type: "FNR,FPR"

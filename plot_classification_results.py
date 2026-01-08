@@ -362,7 +362,7 @@ def plot_counterfactual_metrics(cf_df: pd.DataFrame, output_dir: Path):
     causal_model_mapping = {
         "linear": "Linear",
         "lgbm": "LGBM",
-        "diffusion": "FCM",
+        "diffusion": "DCM",
         "causalflow": "CNF",
     }
 

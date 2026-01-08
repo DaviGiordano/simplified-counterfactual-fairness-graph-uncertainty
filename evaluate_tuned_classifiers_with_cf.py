@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
-Script to fit and evaluate classification models (LR, RF, GB, FairGBM) with counterfactual fairness analysis.
-Evaluates models without sensitive features (except FairGBM which uses sensitive features for regularization).
-Evaluates counterfactual fairness using PSR and NSR metrics across all causal worlds.
+Script to evaluate previously tuned classifiers with counterfactual fairness analysis.
+Loads pre-trained models from tuning output directory and evaluates them with CF metrics.
 """
 
 import argparse
@@ -13,12 +12,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 import pandas as pd
-from fairgbm import FairGBMClassifier
 from sklearn.base import ClassifierMixin
-from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
-from sklearn.linear_model import LogisticRegression
 
-from src.classification.classify import fit_evaluate_classifier_with_tuning
 from src.dataset.counterfactuals_wrapper import MultiWorldCounterfactuals
 from src.dataset.load import load_dataset_col_trf
 from src.log.logging_config import setup_logging
@@ -31,7 +26,7 @@ logger = logging.getLogger(__name__)
 def parse_arguments():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
-        description="Evaluate a classifier with counterfactual fairness analysis across multiple causal models"
+        description="Evaluate previously tuned classifiers with counterfactual fairness analysis"
     )
     parser.add_argument(
         "--dataset", type=str, default="adult", help="Dataset to use (default: adult)"
@@ -47,110 +42,77 @@ def parse_arguments():
         "--knowledge", type=str, default="med", help="Knowledge level (default: med)"
     )
     parser.add_argument(
+        "--tuning-root",
+        type=Path,
+        help="Root directory of tuning outputs (default: output/{dataset}/{knowledge}/tuning_comprehensive)",
+    )
+    parser.add_argument(
         "--output-dir",
         type=Path,
-        help="Output directory (default: output/{dataset}/{knowledge}/classification)",
-    )
-    parser.add_argument(
-        "--tune-hyperparameters",
-        action="store_true",
-        help="Enable hyperparameter tuning",
-    )
-    parser.add_argument(
-        "--tuning-config",
-        type=Path,
-        help="Path to tuning configuration file (default: config/tuning/tuning_config.yaml)",
-    )
-    parser.add_argument(
-        "--n-trials",
-        type=int,
-        default=50,
-        help="Number of hyperparameter optimization trials (default: 50)",
+        help="Output directory (default: output/{dataset}/{knowledge}/tuned_classification_cf)",
     )
 
     return parser.parse_args()
 
 
-def fit_evaluate_classifier(
-    classifier_name: str,
-    enc_dataset,
-    output_dir: Path,
+def load_tuned_classifier(
+    classifier_name: str, tuning_root: Path, enc_dataset
 ) -> Tuple[Any, pd.Series, Dict, Dict]:
     """
-    Fit a classifier without hyperparameter tuning.
+    Load a previously tuned classifier and its evaluation metrics.
 
     Args:
         classifier_name: Name of the classifier ('LR', 'RF', 'GB', 'FAIRGBM')
+        tuning_root: Root directory containing tuning outputs
         enc_dataset: Encoded dataset wrapper
-        output_dir: Output directory for saving results
 
     Returns:
-        Tuple of (classifier, predictions)
+        Tuple of (classifier, predictions, model_performance, group_fairness)
     """
-    logger.info(f"Fitting {classifier_name} classifier")
+    logger.info(f"Loading tuned {classifier_name} classifier")
 
-    # Prepare data - drop sensitive features for all models
-    X_train = enc_dataset.X_enc_train.copy()
+    classifier_dir = tuning_root / classifier_name
+    if not classifier_dir.exists():
+        raise ValueError(f"Tuning directory not found: {classifier_dir}")
+
+    # Load the best model
+    model_file = classifier_dir / f"tuning/{classifier_name}_best_model.pkl"
+    if not model_file.exists():
+        raise ValueError(f"Best model file not found: {model_file}")
+
+    with open(model_file, "rb") as f:
+        classifier = pickle.load(f)
+
+    # Load performance metrics
+    perf_file = classifier_dir / "model_performance.json"
+    if not perf_file.exists():
+        raise ValueError(f"Model performance file not found: {perf_file}")
+
+    with open(perf_file, "r") as f:
+        model_performance = json.load(f)
+
+    # Load group fairness metrics
+    gf_file = classifier_dir / "group_fairness.json"
+    if not gf_file.exists():
+        raise ValueError(f"Group fairness file not found: {gf_file}")
+
+    with open(gf_file, "r") as f:
+        group_fairness = json.load(f)
+
+    # Make predictions on test set
     X_test = enc_dataset.X_enc_test.copy()
-
+    # Always drop sensitive feature to match training (including FAIRGBM)
     logger.info(
         f"Dropping {enc_dataset.enc_sensitive_name} for model {classifier_name}"
     )
-    X_train = X_train.drop(columns=enc_dataset.enc_sensitive_name)
     X_test = X_test.drop(columns=enc_dataset.enc_sensitive_name)
 
-    # Fit classifier based on type
-    if classifier_name == "FAIRGBM":
-        # Convert sensitive attributes to numeric format for FAIRGBM
-        s_train_numeric = enc_dataset.sensitive_train.copy()
-
-        # Convert string values to numeric (assuming binary sensitive attribute)
-        unique_values = sorted(enc_dataset.sensitive_train.unique())
-        if len(unique_values) != 2:
-            raise ValueError(
-                f"Expected binary sensitive attribute, got {len(unique_values)} unique values: {unique_values}"
-            )
-
-        # Map to 0 and 1
-        value_map = {"Female": 0, "Male": 1}
-        s_train_numeric = s_train_numeric.map(value_map).astype(int)
-
-        logger.info(f"Converted sensitive attributes: {value_map}")
-
-        # Fit FairGBM with default parameters
-        classifier = FairGBMClassifier()
-        classifier.fit(
-            X_train,
-            enc_dataset.y_train,
-            constraint_group=s_train_numeric,
-        )
-    else:
-        # Standard sklearn classifiers
-        MODEL_MAPPING = {
-            "LR": LogisticRegression,
-            "RF": RandomForestClassifier,
-            "GB": GradientBoostingClassifier,
-        }
-
-        if classifier_name not in MODEL_MAPPING:
-            raise ValueError(f"Unknown classifier: {classifier_name}")
-
-        # Fit classifier with default parameters
-        classifier = MODEL_MAPPING[classifier_name]()
-        classifier.fit(X_train, enc_dataset.y_train)
-
-    # Make predictions
     y_pred = pd.Series(
         classifier.predict(X_test),
         index=enc_dataset.X_enc_test.index,
     )
 
-    # Evaluate and save metrics
-    model_performance = evaluate_performance(enc_dataset.y_test, y_pred)
-    group_fairness = evaluate_group_fairness(
-        enc_dataset.y_test, y_pred, enc_dataset.sensitive_test
-    )
-
+    logger.info(f"Successfully loaded {classifier_name} classifier")
     return classifier, y_pred, model_performance, group_fairness
 
 
@@ -205,6 +167,7 @@ def evaluate_counterfactual_fairness(
     sensitive_test: pd.Series,
     causal_models: List[str],
     enc_dataset,
+    classifier_name: str,
 ) -> pd.DataFrame:
     """
     Evaluate counterfactual fairness using PSR and NSR metrics.
@@ -215,6 +178,8 @@ def evaluate_counterfactual_fairness(
         counterfactuals: Dictionary of counterfactual worlds by causal model
         sensitive_test: Sensitive attributes for test set
         causal_models: List of causal model names
+        enc_dataset: Encoded dataset wrapper
+        classifier_name: Name of the classifier
 
     Returns:
         DataFrame with counterfactual fairness metrics
@@ -231,7 +196,6 @@ def evaluate_counterfactual_fairness(
         for world_idx, cf_world in enumerate(counterfactuals[causal_model]):
             try:
                 # Make predictions on counterfactual data
-                # Drop sensitive features if they exist in counterfactual data
                 cf_features = cf_world.copy()
 
                 # Remove the sensitive feature column that was dropped during training
@@ -250,8 +214,6 @@ def evaluate_counterfactual_fairness(
                 )
 
                 # Ensure feature alignment with the features used during training
-                # The classifier was trained without sensitive features, so we need to match that
-                # Create the expected columns by removing the sensitive feature from test data columns
                 expected_columns = [
                     col
                     for col in enc_dataset.X_enc_test.columns
@@ -277,6 +239,7 @@ def evaluate_counterfactual_fairness(
 
                 # Add metadata
                 result = {
+                    "classifier": classifier_name,
                     "causal_model": causal_model,
                     "causal_world": world_idx,
                     **cf_metrics,
@@ -318,14 +281,23 @@ def save_results(
 
 
 def main():
-    """Main function to evaluate a classifier with counterfactual fairness."""
+    """Main function to evaluate a tuned classifier with counterfactual fairness."""
     args = parse_arguments()
     base_path = find_root()
+
+    # Set up tuning root directory
+    if args.tuning_root is None:
+        tuning_root = (
+            base_path / f"output/{args.dataset}/{args.knowledge}/tuning_comprehensive"
+        )
+    else:
+        tuning_root = args.tuning_root
 
     # Set up output directory
     if args.output_dir is None:
         output_dir = (
-            base_path / f"output/{args.dataset}/{args.knowledge}/classification"
+            base_path
+            / f"output/{args.dataset}/{args.knowledge}/tuned_classification_cf"
         )
     else:
         output_dir = args.output_dir
@@ -333,9 +305,10 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Set up logging
-    setup_logging(output_dir / "evaluate_classifiers.log")
-    logger.info(f"Starting classifier evaluation with counterfactual fairness")
+    setup_logging(output_dir / "evaluate_tuned_classifiers.log")
+    logger.info(f"Starting tuned classifier evaluation with counterfactual fairness")
     logger.info(f"Dataset: {args.dataset}, Knowledge: {args.knowledge}")
+    logger.info(f"Tuning root: {tuning_root}")
     logger.info(f"Output directory: {output_dir}")
 
     # Load dataset
@@ -351,57 +324,16 @@ def main():
         base_path, args.dataset, args.knowledge, causal_models
     )
 
-    # Evaluate each classifier
+    # Evaluate the classifier
     logger.info(f"\n{'='*50}")
-    logger.info(f"Evaluating {args.classifier}")
+    logger.info(f"Evaluating tuned {args.classifier}")
     logger.info(f"{'='*50}")
 
     try:
-        # Set up model output directory
-        model_output_dir = (
-            base_path / f"output/{args.dataset}/model_metrics/{args.classifier}"
+        # Load tuned classifier
+        classifier, y_pred, model_performance, group_fairness = load_tuned_classifier(
+            args.classifier, tuning_root, enc_dataset
         )
-
-        # Set up tuning configuration if enabled
-        tuning_config_file = None
-        if args.tune_hyperparameters:
-            if args.tuning_config:
-                tuning_config_file = args.tuning_config
-            else:
-                tuning_config_file = base_path / "config/tuning/tuning_config.yaml"
-
-            # Update n_trials in config if specified
-            if args.n_trials != 50:
-                import yaml
-
-                with open(tuning_config_file, "r") as f:
-                    tuning_config = yaml.safe_load(f)
-                tuning_config["tuning"]["n_trials"] = args.n_trials
-                with open(tuning_config_file, "w") as f:
-                    yaml.dump(tuning_config, f, default_flow_style=False)
-
-        # Fit and evaluate classifier
-        if args.tune_hyperparameters:
-            classifier, y_pred, tuning_results = fit_evaluate_classifier_with_tuning(
-                args.classifier,
-                enc_dataset,
-                model_output_dir,
-                tune_hyperparameters=True,
-                tuning_config_file=tuning_config_file,
-            )
-            # Extract performance metrics from tuning results
-            model_performance = tuning_results["test_results"]
-            group_fairness = evaluate_group_fairness(
-                enc_dataset.y_test, y_pred, enc_dataset.sensitive_test
-            )
-        else:
-            classifier, y_pred, model_performance, group_fairness = (
-                fit_evaluate_classifier(
-                    args.classifier,
-                    enc_dataset,
-                    model_output_dir,
-                )
-            )
 
         # Evaluate counterfactual fairness
         cf_results = evaluate_counterfactual_fairness(
@@ -411,6 +343,7 @@ def main():
             enc_dataset.sensitive_test,
             causal_models,
             enc_dataset,
+            args.classifier,
         )
 
         # Save results
@@ -422,12 +355,13 @@ def main():
             output_dir,
         )
 
-        logger.info(f"Completed evaluation for {args.classifier}")
+        logger.info(f"Completed evaluation for tuned {args.classifier}")
 
     except Exception as e:
-        logger.error(f"Error evaluating {args.classifier}: {e}")
+        logger.error(f"Error evaluating tuned {args.classifier}: {e}")
+        raise
 
-    logger.info("Classifier evaluation completed!")
+    logger.info("Tuned classifier evaluation completed!")
 
 
 if __name__ == "__main__":
